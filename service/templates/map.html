@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Maps Integration</title>
+
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDv2tBZkVQqo9C2cSas1MRhXKP0qiyTJ9s&callback=initMap" async defer></script>
+  <style>
+    /* Set the height of the map container */
+    #map {
+      height: 500px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h3>My Google Map</h3>
+  <div id="map"></div>
+
+  <script>
+    function initMap() {
+      // The location you want to center the map on
+      var myLatLng = { lat: 48.8566, lng: 2.3522 }; // Example coordinates (Paris)
+
+      // Create a map object and specify options
+      var map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 12,
+        center: myLatLng,
+      });
+
+      // Add a marker at the given location
+      var marker = new google.maps.Marker({
+        position: myLatLng,
+        map: map,
+        title: "Hello World!",
+      });
+    }
+  </script>
+</body>
+</html>

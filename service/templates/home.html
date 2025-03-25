@@ -1,0 +1,305 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hostel Finder</title>
+    <link rel="stylesheet" href="{% static 'css/style1.css' %}">
+    <link rel="icon" href="/path/to/favicon.ico">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            overflow: hidden;
+            padding: 0 20px;
+        }
+        header {
+            background: #35424a;
+            color: #ffffff;
+            padding-top: 30px;
+            min-height: 70px;
+            border-bottom: #e8491d 3px solid;
+            text-align: center;
+        }
+        .search-bar {
+            display: flex;
+            margin: 20px 0;
+        }
+        .search-bar input {
+            flex-grow: 1;
+            padding: 10px;
+            margin-right: 10px;
+        }
+        .search-bar button {
+            padding: 10px 20px;
+            background: #e8491d;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #result, #hostel-list {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .hostel-item {
+            border-bottom: 1px solid #ddd;
+            padding: 10px 0;
+        }
+        .hostel-item:last-child {
+            border-bottom: none;
+        }
+        .location button {
+            background: #35424a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        footer {
+            background: #35424a;
+            color: #ffffff;
+            text-align: center;
+            padding: 20px;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+        }
+        .hostel-item a {
+            color: #e8491d;
+            text-decoration: none;
+        }
+        .hostel-item a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Hostel Finder</h1>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="search-bar">
+                <input type="text" id="address-input" placeholder="Enter address..." aria-label="Enter address">
+                <button id="get-coordinates-btn" aria-label="Get Coordinates">Get Coordinates</button>
+            </div>
+        
+            <div id="result">
+                <!-- Results will be displayed here -->
+                <p>Enter an address to find its coordinates and nearby hostels.</p>
+            </div>
+            
+            <div class="location">
+                <button onclick="getLocation()" aria-label="Find nearby hostels">Find Nearby Hostels</button>
+                <p id="location-info"></p>
+            </div>
+
+            <div id="hostel-list" class="hostel-list">
+                <!-- Hostel items will be dynamically added here -->
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Hostel Finder</p>
+        </div>
+    </footer>
+
+    <script>
+        // Event listener for coordinate search
+        document.getElementById('get-coordinates-btn').addEventListener('click', function () {
+            const address = document.getElementById('address-input').value.trim();
+            if (address) {
+                getCoordinatesFromNominatim(address);
+            } else {
+                alert("Please enter a valid address.");
+            }
+        });
+
+        // Function to fetch coordinates using the Nominatim API
+        function getCoordinatesFromNominatim(address) {
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json`;
+
+            // Clear previous results
+            document.getElementById('result').innerHTML = '<p>Searching...</p>';
+            document.getElementById('hostel-list').innerHTML = '';
+
+            fetch(url, {
+                headers: {
+                    'User-Agent': 'HostelFinder/1.0 (hostel.finder@example.com)'
+                }
+            })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Failed to fetch data from the API.");
+                }
+                return response.json();
+            })
+            .then((data) => {
+                if (data.length > 0) {
+                    // Extract the first result's coordinates
+                    const { lat, lon, display_name } = data[0];
+                    displayResult(lat, lon, display_name);
+                    const radius = 5000; // Increased search radius to 5 km
+                    fetchHostels(lat, lon, radius);
+                } else {
+                    document.getElementById('result').innerHTML = '<p>No results found for the entered address.</p>';
+                    document.getElementById('hostel-list').innerHTML = '';
+                }
+            })
+            .catch((error) => {
+                console.error("Error fetching data from Nominatim API:", error);
+                document.getElementById('result').innerHTML = `<p>Error: ${error.message}</p>`;
+            });
+        }
+
+        // Function to display the coordinates and address
+        function displayResult(lat, lon, address) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <h3>Coordinates Found:</h3>
+                <p><strong>Latitude:</strong> ${lat}</p>
+                <p><strong>Longitude:</strong> ${lon}</p>
+                <p><strong>Address:</strong> ${address}</p>
+            `;
+        }
+
+        // Updated Function to fetch hostels using the Overpass API
+        function fetchHostels(lat, lon, radius) {
+            const query = `
+                [out:json][timeout:25];
+                (
+                  node["tourism"="hostel"](around:${radius}, ${lat}, ${lon});
+                  node["tourism"="hostel_dormitory"](around:${radius}, ${lat}, ${lon});
+                  way["tourism"="hostel"](around:${radius}, ${lat}, ${lon});
+                  way["tourism"="hostel_dormitory"](around:${radius}, ${lat}, ${lon});
+                  relation["tourism"="hostel"](around:${radius}, ${lat}, ${lon});
+                  relation["tourism"="hostel_dormitory"](around:${radius}, ${lat}, ${lon});
+                );
+                out body;
+                >; // Resolve references
+                out skel qt;
+            `;
+            const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+            // Clear previous hostel list
+            const hostelList = document.getElementById('hostel-list');
+            hostelList.innerHTML = '<p>Searching for hostels...</p>';
+
+            fetch(overpassUrl)
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Failed to fetch hostel data from Overpass API.");
+                    }
+                    return response.json();
+                })
+                .then((data) => {
+                    console.log("Overpass API Response:", data); // Debugging log
+                    
+                    if (data.elements && data.elements.length > 0) {
+                        // Filter out duplicates
+                        const uniqueHostels = Array.from(
+                            new Set(data.elements.map(el => el.id))
+                        ).map(id => data.elements.find(el => el.id === id));
+                        
+                        displayHostels(uniqueHostels);
+                    } else {
+                        hostelList.innerHTML = '<p>No hostels found nearby. Try increasing the search radius.</p>';
+                    }
+                })
+                .catch((error) => {
+                    console.error("Error fetching data from Overpass API:", error);
+                    hostelList.innerHTML = `<p>Error: ${error.message}. Check console for details.</p>`;
+                });
+        }
+
+        // Updated Function to display the list of hostels
+        function displayHostels(hostels) {
+            const hostelList = document.getElementById('hostel-list');
+            hostelList.innerHTML = ''; // Clear the current list
+
+            const hostelHeader = document.createElement('h2');
+            hostelHeader.textContent = `Hostels Found: ${hostels.length}`;
+            hostelList.appendChild(hostelHeader);
+
+            // Expanded tag search for better information display
+            hostels.forEach((hostel) => {
+                const hostelItem = document.createElement('div');
+                hostelItem.classList.add('hostel-item');
+
+                const name = hostel.tags?.name || 
+                             hostel.tags?.['name:en'] || 
+                             "Unnamed Hostel";
+                
+                const address = hostel.tags?.['addr:full'] || 
+                                hostel.tags?.['addr:street'] || 
+                                hostel.tags?.['address'] || 
+                                "No address available";
+                
+                const lat = hostel.lat ? hostel.lat.toFixed(4) : "No latitude";
+                const lon = hostel.lon ? hostel.lon.toFixed(4) : "No longitude";
+
+                // Additional details
+                const website = hostel.tags?.website || hostel.tags?.['contact:website'] || "No website";
+                const phone = hostel.tags?.phone || hostel.tags?.['contact:phone'] || "No phone number";
+
+                hostelItem.innerHTML = `
+                    <h3>${name}</h3>
+                    <p><strong>Address:</strong> ${address}</p>
+                    <p><strong>Coordinates:</strong> ${lat}, ${lon}</p>
+                    <p><strong>Website:</strong> ${website !== "No website" ? `<a href="${website}" target="_blank">${website}</a>` : website}</p>
+                    <p><strong>Phone:</strong> ${phone}</p>
+                `;
+
+                hostelList.appendChild(hostelItem);
+            });
+        }
+
+        // Function for getting the user's current location
+        function getLocation() {
+            const locationInfo = document.getElementById("location-info");
+            const hostelList = document.getElementById("hostel-list");
+
+            if (navigator.geolocation) {
+                locationInfo.innerHTML = "Fetching location, please wait...";
+                hostelList.innerHTML = '';
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const latitude = position.coords.latitude;
+                        const longitude = position.coords.longitude;
+
+                        locationInfo.innerHTML = `Your Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                        
+                        // Fetch nearby hostels based on current location
+                        fetchHostels(latitude, longitude, 5000); // 5 km radius
+                    },
+                    (error) => {
+                        locationInfo.innerHTML = "Unable to fetch location.";
+                        hostelList.innerHTML = '<p>Location access denied or unavailable.</p>';
+                    }
+                );
+            } else {
+                locationInfo.innerHTML = "Geolocation is not supported by this browser.";
+                hostelList.innerHTML = '<p>Geolocation not supported.</p>';
+            }
+        }
+    </script>
+</body>
+</html>
